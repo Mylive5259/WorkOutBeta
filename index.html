@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout Planner</title>
+
+<style>
+* {box-sizing:border-box;margin:0;padding:0}
+body {font-family:Segoe UI;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:18px}
+.container {max-width:1200px;margin:auto;color:#222}
+.header {text-align:center;color:#fff;margin-bottom:20px}
+
+.main {display:grid;grid-template-columns:1fr 2fr;gap:18px}
+
+@media (max-width: 768px) {
+  .main {grid-template-columns:1fr}
+}
+
+.panel {background:#fff;border-radius:14px;padding:16px;box-shadow:0 10px 35px rgba(0,0,0,.25)}
+
+.equipmentBtn {padding:12px;border-radius:10px;background:#f2f2f2;margin-bottom:7px;cursor:pointer;border-left:4px solid #ccc;font-weight:600}
+.equipmentBtn.active {background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-left-color:#764ba2}
+
+.muscleGroup {margin-top:14px;font-weight:700;color:#764ba2;padding:8px;background:#f0f0f0;border-radius:8px}
+
+.exerciseRow {display:flex;gap:6px;margin-bottom:6px;margin-top:5px}
+.exerciseBtn {flex:1;padding:9px;border-radius:8px;border:2px solid #ddd;background:#f4f4f4;cursor:pointer;text-align:left}
+.exerciseBtn.selected {background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-color:#5568d3}
+.viewBtn {background:#ff5252;color:white;border:none;border-radius:8px;padding:0 12px;cursor:pointer;font-weight:bold}
+
+.badge {background:#667eea;color:white;padding:6px 10px;border-radius:20px;margin:3px;display:inline-block;cursor:pointer;font-size:13px}
+.removeBadge {position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#f44336;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;line-height:1;cursor:pointer}
+.removeBadge:hover {background:#d32f2f}
+
+.card {background:#f7f7f7;border-radius:12px;padding:12px;margin-top:12px;border:2px solid #e0e0e0}
+.cardHeader {display:flex;justify-content:space-between;margin-bottom:8px;align-items:center}
+
+.btn {border:none;border-radius:8px;padding:5px 9px;color:white;cursor:pointer;margin-left:4px}
+.edit {background:#4CAF50}
+.del {background:#f44336}
+
+.modal {display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.65);align-items:center;justify-content:center;z-index:999}
+.modal.active {display:flex}
+.modalBox {background:white;border-radius:14px;padding:18px;width:92%;max-width:720px;position:relative;max-height:90vh;overflow-y:auto}
+.close {position:absolute;top:8px;right:14px;font-size:26px;cursor:pointer;background:#f44336;color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1}
+.close:hover {background:#d32f2f}
+
+.info-box {background:#e3f2fd;border-left:4px solid #2196f3;padding:12px;margin:10px 0;border-radius:4px;font-size:14px}
+
+/* Search Box Styles */
+.searchBox {position:relative;margin-bottom:12px}
+.searchBox input {width:100%;padding:10px 40px 10px 12px;border:2px solid #ddd;border-radius:10px;font-size:15px;outline:none;transition:border .3s}
+.searchBox input:focus {border-color:#667eea}
+.searchIcon {position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#999;font-size:18px;pointer-events:none}
+.clearSearch {position:absolute;right:40px;top:50%;transform:translateY(-50%);background:#f44336;color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;display:none}
+.clearSearch.show {display:block}
+.noResults {text-align:center;color:#999;padding:30px;font-size:14px}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<div class="header">
+<h1>🏋️ โปรแกรมจัดตารางเวท</h1>
+<p>เลือกวัน → เลือกอุปกรณ์ → เลือกท่า → ดูวิดีโอ</p>
+</div>
+
+<div class="panel" style="margin-bottom:18px">
+<h3>📊 ตารางสัปดาห์ของคุณ</h3>
+<div id="schedule"></div>
+</div>
+
+<div class="main">
+
+<div class="panel">
+<h3>📅 เลือกวัน</h3>
+<div id="dayList"></div>
+</div>
+
+<div class="panel">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+  <h3>💪 เลือกท่าฝึก</h3>
+  <div id="equipmentSelector"></div>
+</div>
+
+<!-- Search Box -->
+<div class="searchBox">
+  <input type="text" id="searchInput" placeholder="🔍 ค้นหาท่าฝึก (ชื่อท่า, กล้ามเนื้อ, ประเภท)..." />
+  <span class="searchIcon">🔍</span>
+  <button class="clearSearch" id="clearSearch" onclick="clearSearch()">×</button>
+</div>
+
+<div id="exerciseList">← เลือกวันและอุปกรณ์</div>
+</div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal" id="modal">
+<div class="modalBox">
+<span class="close" onclick="closeDetail()">×</span>
+
+<h2 id="mTitle" style="margin-bottom:10px"></h2>
+
+<div style="text-align:center;margin:10px 0">
+<img id="mImg" style="max-width:100%;border-radius:12px;display:none">
+<video id="mVideo" controls playsinline preload="metadata"
+style="width:100%;border-radius:12px;margin-top:10px;display:none">
+<source id="mVideoSrc" src="" type="video/mp4">
+</video>
+</div>
+
+<p id="mDesc" style="margin:10px 0"></p>
+<p id="mTarget" style="color:#2e7d32;font-weight:600;margin-top:10px"></p>
+<p id="mType" style="color:#764ba2;font-weight:600;margin-top:5px"></p>
+</div>
+</div>
+
+<script>
+
+/* -------- วัน -------- */
+const weekDays = [
+{day:'จันทร์', muscles:[]},
+{day:'อังคาร', muscles:[]},
+{day:'พุธ', muscles:[]},
+{day:'พฤหัสบดี', muscles:[]},
+{day:'ศุกร์', muscles:[]},
+{day:'เสาร์', muscles:[]},
+{day:'อาทิตย์', muscles:[]}
+];
+
+/* -------- localStorage -------- */
+function saveData() {
+  localStorage.setItem("workoutData", JSON.stringify(weekDays));
+}
+
+function loadData() {
+  const d = localStorage.getItem("workoutData");
+  if(!d) return;
+  JSON.parse(d).forEach((p, i) => weekDays[i].muscles = p.muscles || []);
+}
+
+/* -------- ฐานข้อมูลท่า -------- 
+   image: ใส่ลิงก์ URL ของ GIF (ก็อปจากเว็บ)
+   video: ใส่ path ของไฟล์วิดีโอในโฟลเดอร์ videos/ เช่น "./videos/curl.mp4"
+-------- */
+const exercisesData = {
+
+  "🏋️ ดัมเบล": [
+    {name:"Dumbbell Bench Press", muscle:"อก", targets:"อกทั้งหมด", type:"Compound", image:"https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Press.gif", video:"./videos/db-bench.mp4", description:"ท่าหลักสร้างอก"},
+    {name:"Incline Dumbbell Press", muscle:"อก", targets:"อกบน", type:"Compound", image:"https://i.pinimg.com/originals/be/94/3f/be943f55c4a35f5599824db11168d686.gif", video:"./videos/db-incline.mp4", description:"เน้นอกบน"},
+    {name:"Decline Dumbbell Press", muscle:"อก", targets:"อกล่าง", type:"Compound", image:"https://i.pinimg.com/originals/90/89/83/9089835e446b9dd9b180bdfda6b06ad8.gif", video:"./videos/db-decline.mp4", description:"เน้นอกล่าง"},
+    {name:"Dumbbell Fly", muscle:"อก", targets:"อกกลาง", type:"Isolation", image:"", video:"./videos/db-fly.mp4", description:"กางอก"},
+    {name:"Incline Dumbbell Fly", muscle:"อก", targets:"อกบน", type:"Isolation", image:"", video:"./videos/db-incline-fly.mp4", description:"กางอกบน"},
+    
+    {name:"Dumbbell Row", muscle:"หลัง", targets:"กลางหลัง", type:"Compound", image:"", video:"./videos/db-row.mp4", description:"สร้างหลังหนา"},
+    {name:"Single Arm Dumbbell Row", muscle:"หลัง", targets:"กลางหลัง ปีก", type:"Compound", image:"", video:"./videos/db-single-row.mp4", description:"ฝึกทีละข้าง"},
+    {name:"Dumbbell Pullover", muscle:"หลัง", targets:"หลังบน อก", type:"Isolation", image:"", video:"./videos/db-pullover.mp4", description:"ขยายกรงอก"},
+    
+    {name:"Dumbbell Shoulder Press", muscle:"ไหล่", targets:"ไหล่หน้า ไหล่กลาง", type:"Compound", image:"", video:"./videos/db-shoulder-press.mp4", description:"ไหล่แกร่ง"},
+    {name:"Arnold Press", muscle:"ไหล่", targets:"ไหล่ทั้งหมด", type:"Compound", image:"", video:"./videos/arnold-press.mp4", description:"ท่าของ Arnold"},
+    {name:"Dumbbell Lateral Raise", muscle:"ไหล่", targets:"ไหล่กลาง", type:"Isolation", image:"", video:"./videos/db-lateral.mp4", description:"ไหล่กว้าง"},
+    {name:"Dumbbell Front Raise", muscle:"ไหล่", targets:"ไหล่หน้า", type:"Isolation", image:"", video:"./videos/db-front-raise.mp4", description:"ยกหน้า"},
+    {name:"Dumbbell Rear Delt Fly", muscle:"ไหล่", targets:"ไหล่หลัง", type:"Isolation", image:"", video:"./videos/db-rear-delt.mp4", description:"ไหล่หลังโค้ง"},
+    
+    {name:"Dumbbell Curl", muscle:"แขน", targets:"หน้าแขน", type:"Compound", image:"", video:"./videos/db-curl.mp4", description:"ลูกหนู"},
+    {name:"Hammer Curl", muscle:"แขน", targets:"หน้าแขน ข้อมือ", type:"Compound", image:"", video:"./videos/hammer-curl.mp4", description:"จับแบบค้อน"},
+    {name:"Dumbbell Tricep Extension", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/db-tricep-ext.mp4", description:"ยืดหลังแขน"},
+    {name:"Dumbbell Kickback", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/db-kickback.mp4", description:"เตะหลังแขน"},
+    {name:"Concentration Curl", muscle:"แขน", targets:"หน้าแขน", type:"Isolation", image:"", video:"./videos/concentration-curl.mp4", description:"เน้นลูกหนู"},
+    
+    {name:"Dumbbell Squat", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/db-squat.mp4", description:"สควอทด้วยดัมเบล"},
+    {name:"Dumbbell Lunge", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/db-lunge.mp4", description:"ก้าวยาว"},
+    {name:"Dumbbell Romanian Deadlift", muscle:"ขา", targets:"น่อง ก้น", type:"Isolation", image:"", video:"./videos/db-rdl.mp4", description:"เดดลิฟท์ขาตรง"},
+    {name:"Dumbbell Calf Raise", muscle:"ขา", targets:"น่อง", type:"Isolation", image:"", video:"./videos/db-calf.mp4", description:"ยกน่อง"}
+  ],
+
+  "🏋️‍♂️ บาร์เบล": [
+    {name:"Barbell Bench Press", muscle:"อก", targets:"อกทั้งหมด", type:"Compound", image:"", video:"./videos/bb-bench.mp4", description:"ราชาท่าอก"},
+    {name:"Incline Barbell Press", muscle:"อก", targets:"อกบน", type:"Compound", image:"", video:"./videos/bb-incline.mp4", description:"อกบนด้วยบาร์"},
+    {name:"Decline Barbell Press", muscle:"อก", targets:"อกล่าง", type:"Compound", image:"", video:"./videos/bb-decline.mp4", description:"อกล่างด้วยบาร์"},
+    
+    {name:"Barbell Deadlift", muscle:"หลัง", targets:"หลังทั้งหมด ขา", type:"Compound", image:"", video:"./videos/bb-deadlift.mp4", description:"ราชาท่าหลัง"},
+    {name:"Barbell Row", muscle:"หลัง", targets:"กลางหลัง", type:"Compound", image:"", video:"./videos/bb-row.mp4", description:"โรว์ด้วยบาร์"},
+    {name:"T-Bar Row", muscle:"หลัง", targets:"หลังหนา", type:"Compound", image:"", video:"./videos/tbar-row.mp4", description:"โรว์แบบ T"},
+    
+    {name:"Barbell Overhead Press", muscle:"ไหล่", targets:"ไหล่ทั้งหมด", type:"Compound", image:"", video:"./videos/bb-ohp.mp4", description:"ยกบาร์เหนือหัว"},
+    {name:"Barbell Upright Row", muscle:"ไหล่", targets:"ไหล่ คอ", type:"Compound", image:"", video:"./videos/bb-upright-row.mp4", description:"ดึงบาร์ติดคาง"},
+    
+    {name:"Barbell Curl", muscle:"แขน", targets:"หน้าแขน", type:"Compound", image:"", video:"./videos/bb-curl.mp4", description:"คัดลูกหนูด้วยบาร์"},
+    {name:"Close Grip Bench Press", muscle:"แขน", targets:"หลังแขน อก", type:"Compound", image:"", video:"./videos/close-bench.mp4", description:"จับแคบสร้างหลังแขน"},
+    {name:"Barbell Skull Crusher", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/skull-crusher.mp4", description:"ทุบหัวกะโหลก"},
+    {name:"EZ Bar Curl", muscle:"แขน", targets:"หน้าแขน", type:"Isolation", image:"", video:"./videos/ez-curl.mp4", description:"คัดด้วย EZ Bar"},
+    
+    {name:"Barbell Squat", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/bb-squat.mp4", description:"ราชาท่าขา"},
+    {name:"Front Squat", muscle:"ขา", targets:"ต้นขาหน้า", type:"Compound", image:"", video:"./videos/front-squat.mp4", description:"สควอทหน้า"},
+    {name:"Barbell Lunge", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/bb-lunge.mp4", description:"ก้าวยาวด้วยบาร์"},
+    {name:"Romanian Deadlift", muscle:"ขา", targets:"น่อง ก้น", type:"Compound", image:"", video:"./videos/bb-rdl.mp4", description:"RDL"}
+  ],
+
+  "💪 น้ำหนักตัว": [
+    {name:"Push-up", muscle:"อก", targets:"อก ไหล่ หลังแขน", type:"Compound", image:"", video:"./videos/pushup.mp4", description:"วิดพื้นพื้นฐาน"},
+    {name:"Wide Push-up", muscle:"อก", targets:"อกกว้าง", type:"Compound", image:"", video:"./videos/wide-pushup.mp4", description:"มือกว้าง"},
+    {name:"Diamond Push-up", muscle:"แขน", targets:"หลังแขน อกใน", type:"Compound", image:"", video:"./videos/diamond-pushup.mp4", description:"มือชิด"},
+    {name:"Decline Push-up", muscle:"อก", targets:"อกบน", type:"Compound", image:"", video:"./videos/decline-pushup.mp4", description:"เท้าสูง"},
+    
+    {name:"Pull-up", muscle:"หลัง", targets:"หลัง ปีก", type:"Compound", image:"", video:"./videos/pullup.mp4", description:"ท่าหลักหลัง"},
+    {name:"Chin-up", muscle:"แขน", targets:"หน้าแขน หลัง", type:"Compound", image:"", video:"./videos/chinup.mp4", description:"ฝ่ามือหันหน้า"},
+    {name:"Australian Pull-up", muscle:"หลัง", targets:"กลางหลัง", type:"Compound", image:"", video:"./videos/aussie-pullup.mp4", description:"โรว์แบบแขวน"},
+    
+    {name:"Dips", muscle:"อก", targets:"อกล่าง หลังแขน", type:"Compound", image:"", video:"./videos/dips.mp4", description:"จุ่มตัว"},
+    {name:"Tricep Dips", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/tricep-dips.mp4", description:"จุ่มหลังแขน"},
+    
+    {name:"Bodyweight Squat", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/bw-squat.mp4", description:"สควอทน้ำหนักตัว"},
+    {name:"Pistol Squat", muscle:"ขา", targets:"ต้นขา ก้น สมดุล", type:"Compound", image:"", video:"./videos/pistol-squat.mp4", description:"ขาเดียว"},
+    {name:"Bulgarian Split Squat", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/bulgarian-squat.mp4", description:"ขาหลังยก"},
+    {name:"Calf Raise", muscle:"ขา", targets:"น่อง", type:"Isolation", image:"", video:"./videos/calf-raise.mp4", description:"ยกน่อง"},
+    
+    {name:"Plank", muscle:"ท้อง", targets:"คอร์", type:"Isolation", image:"", video:"./videos/plank.mp4", description:"แพลงค์"},
+    {name:"Side Plank", muscle:"ท้อง", targets:"ข้าง", type:"Isolation", image:"", video:"./videos/side-plank.mp4", description:"แพลงค์ข้าง"},
+    {name:"Leg Raise", muscle:"ท้อง", targets:"ท้องล่าง", type:"Isolation", image:"", video:"./videos/leg-raise.mp4", description:"ยกขา"},
+    {name:"Bicycle Crunch", muscle:"ท้อง", targets:"ท้องทั้งหมด", type:"Isolation", image:"", video:"./videos/bicycle-crunch.mp4", description:"ปั่นจักรยาน"}
+  ],
+
+  "🏃 เครื่อง": [
+    {name:"Chest Press Machine", muscle:"อก", targets:"อกทั้งหมด", type:"Compound", image:"", video:"./videos/machine-chest.mp4", description:"เครื่องอก"},
+    {name:"Pec Deck Fly", muscle:"อก", targets:"อกกลาง", type:"Isolation", image:"", video:"./videos/pec-deck.mp4", description:"กางอกเครื่อง"},
+    {name:"Cable Crossover", muscle:"อก", targets:"อกกลาง", type:"Isolation", image:"", video:"./videos/cable-cross.mp4", description:"กางสาย"},
+    
+    {name:"Lat Pulldown", muscle:"หลัง", targets:"หลังบน ปีก", type:"Compound", image:"", video:"./videos/lat-pull.mp4", description:"ดึงลาท"},
+    {name:"Seated Cable Row", muscle:"หลัง", targets:"กลางหลัง", type:"Compound", image:"", video:"./videos/cable-row.mp4", description:"โรว์นั่ง"},
+    {name:"Face Pull", muscle:"ไหล่", targets:"ไหล่หลัง", type:"Isolation", image:"", video:"./videos/face-pull.mp4", description:"ดึงหน้า"},
+    
+    {name:"Shoulder Press Machine", muscle:"ไหล่", targets:"ไหล่ทั้งหมด", type:"Compound", image:"", video:"./videos/machine-shoulder.mp4", description:"เครื่องไหล่"},
+    {name:"Cable Lateral Raise", muscle:"ไหล่", targets:"ไหล่กลาง", type:"Isolation", image:"", video:"./videos/cable-lateral.mp4", description:"ยกข้างสาย"},
+    
+    {name:"Cable Curl", muscle:"แขน", targets:"หน้าแขน", type:"Isolation", image:"", video:"./videos/cable-curl.mp4", description:"คัดสาย"},
+    {name:"Tricep Pushdown", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/tricep-push.mp4", description:"กดสาย"},
+    {name:"Overhead Cable Extension", muscle:"แขน", targets:"หลังแขน", type:"Isolation", image:"", video:"./videos/cable-overhead.mp4", description:"ยืดเหนือหัว"},
+    
+    {name:"Leg Press", muscle:"ขา", targets:"ต้นขา ก้น", type:"Compound", image:"", video:"./videos/leg-press.mp4", description:"เครื่องกดขา"},
+    {name:"Leg Extension", muscle:"ขา", targets:"ต้นขาหน้า", type:"Isolation", image:"", video:"./videos/leg-ext.mp4", description:"เหยียดขา"},
+    {name:"Leg Curl", muscle:"ขา", targets:"น่อง", type:"Isolation", image:"", video:"./videos/leg-curl.mp4", description:"งอขา"},
+    {name:"Calf Machine", muscle:"ขา", targets:"น่อง", type:"Isolation", image:"", video:"./videos/calf-machine.mp4", description:"เครื่องน่อง"},
+    
+    {name:"Cable Crunch", muscle:"ท้อง", targets:"ท้องบน", type:"Isolation", image:"", video:"./videos/cable-crunch.mp4", description:"คร้นช์สาย"},
+    {name:"Ab Wheel", muscle:"ท้อง", targets:"คอร์", type:"Compound", image:"", video:"./videos/ab-wheel.mp4", description:"ลูกกลิ้งท้อง"}
+  ]
+};
+
+let selectedDay = 0;
+let selectedEquipment = Object.keys(exercisesData)[0];
+let searchTerm = "";
+
+/* -------- วัน -------- */
+function renderDays() {
+  const box = document.getElementById("dayList");
+  box.innerHTML = "";
+  weekDays.forEach((d, i) => {
+    const btn = document.createElement("div");
+    btn.className = "equipmentBtn";
+    if(i === selectedDay) btn.classList.add("active");
+    btn.innerText = d.day;
+    btn.onclick = () => selectDay(i);
+    box.appendChild(btn);
+  });
+}
+
+function selectDay(i) {
+  selectedDay = i;
+  renderDays();
+  renderExercises();
+}
+
+/* -------- อุปกรณ์ -------- */
+function renderEquipmentSelector() {
+  const box = document.getElementById("equipmentSelector");
+  box.innerHTML = "";
+  const select = document.createElement("select");
+  select.style.cssText = "padding:8px;border-radius:8px;border:2px solid #ddd;background:white;cursor:pointer;font-size:14px";
+  
+  Object.keys(exercisesData).forEach((eq, i) => {
+    const opt = document.createElement("option");
+    opt.value = eq;
+    opt.innerText = eq;
+    if(eq === selectedEquipment) opt.selected = true;
+    select.appendChild(opt);
+  });
+  
+  select.onchange = (e) => {
+    selectedEquipment = e.target.value;
+    renderExercises();
+  };
+  
+  box.appendChild(select);
+}
+
+/* -------- Search Functions -------- */
+function setupSearch() {
+  const input = document.getElementById("searchInput");
+  const clearBtn = document.getElementById("clearSearch");
+  
+  input.addEventListener("input", (e) => {
+    searchTerm = e.target.value.toLowerCase().trim();
+    clearBtn.classList.toggle("show", searchTerm.length > 0);
+    renderExercises();
+  });
+  
+  input.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") {
+      clearSearch();
+    }
+  });
+}
+
+function clearSearch() {
+  const input = document.getElementById("searchInput");
+  const clearBtn = document.getElementById("clearSearch");
+  input.value = "";
+  searchTerm = "";
+  clearBtn.classList.remove("show");
+  renderExercises();
+  input.focus();
+}
+
+function filterExercises(exercises) {
+  if(!searchTerm) return exercises;
+  
+  return exercises.filter(ex => {
+    return ex.name.toLowerCase().includes(searchTerm) ||
+           ex.muscle.toLowerCase().includes(searchTerm) ||
+           ex.targets.toLowerCase().includes(searchTerm) ||
+           ex.type.toLowerCase().includes(searchTerm) ||
+           ex.description.toLowerCase().includes(searchTerm);
+  });
+}
+
+/* -------- ท่าฝึก -------- */
+function renderExercises() {
+  const box = document.getElementById("exerciseList");
+  box.innerHTML = "";
+
+  const exercises = exercisesData[selectedEquipment];
+  const filtered = filterExercises(exercises);
+  
+  if(filtered.length === 0) {
+    box.innerHTML = `<div class="noResults">
+      ไม่พบท่าที่ตรงกับ "<b>${searchTerm}</b>"<br>
+      ลองค้นหาด้วยคำอื่น เช่น ชื่อท่า, กล้ามเนื้อ, หรือประเภท
+    </div>`;
+    return;
+  }
+  
+  // จัดกลุ่มตามกล้ามเนื้อ
+  const grouped = {};
+  filtered.forEach(ex => {
+    if(!grouped[ex.muscle]) grouped[ex.muscle] = [];
+    grouped[ex.muscle].push(ex);
+  });
+
+  // แสดงแต่ละกลุ่มกล้ามเนื้อ
+  for(const muscle in grouped) {
+    const muscleDiv = document.createElement("div");
+    muscleDiv.className = "muscleGroup";
+    muscleDiv.textContent = "🎯 " + muscle;
+    box.appendChild(muscleDiv);
+
+    grouped[muscle].forEach(ex => {
+      const row = document.createElement("div");
+      row.className = "exerciseRow";
+
+      const btn = document.createElement("button");
+      btn.className = "exerciseBtn";
+      btn.innerHTML = `<b>${ex.name}</b><br><small>🎯 ${ex.targets} | ${ex.type}</small>`;
+      if(weekDays[selectedDay].muscles.includes(ex.name)) btn.classList.add("selected");
+      btn.onclick = () => toggleExercise(ex);
+
+      const view = document.createElement("button");
+      view.className = "viewBtn";
+      view.textContent = "▶";
+      view.onclick = (e) => {e.stopPropagation(); showDetail(ex)};
+
+      row.appendChild(btn);
+      row.appendChild(view);
+      box.appendChild(row);
+    });
+  }
+  
+  // Show search result count
+  if(searchTerm) {
+    const resultCount = document.createElement("div");
+    resultCount.style.cssText = "text-align:center;color:#667eea;padding:10px;font-size:13px;font-weight:600";
+    resultCount.innerHTML = `พบ ${filtered.length} ท่าที่ตรงกับ "<b>${searchTerm}</b>"`;
+    box.insertBefore(resultCount, box.firstChild);
+  }
+}
+
+function toggleExercise(ex) {
+  const list = weekDays[selectedDay].muscles;
+  const i = list.indexOf(ex.name);
+  i > -1 ? list.splice(i, 1) : list.push(ex.name);
+  renderExercises();
+  renderSchedule();
+  saveData();
+}
+
+/* -------- ตาราง -------- */
+function renderSchedule() {
+  const box = document.getElementById("schedule");
+  box.innerHTML = "";
+  
+  let hasAny = false;
+  weekDays.forEach((d, i) => {
+    if(!d.muscles.length) return;
+    hasAny = true;
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const head = document.createElement("div");
+    head.className = "cardHeader";
+
+    const title = document.createElement("b");
+    title.innerText = d.day;
+    title.style.fontSize = "18px";
+
+    const actions = document.createElement("div");
+
+    const edit = document.createElement("button");
+    edit.className = "btn edit";
+    edit.innerText = "✏️ แก้ไข";
+    edit.onclick = () => editDay(i);
+
+    const del = document.createElement("button");
+    del.className = "btn del";
+    del.innerText = "🗑️ ลบ";
+    del.onclick = () => deleteDay(i);
+
+    actions.appendChild(edit);
+    actions.appendChild(del);
+    head.appendChild(title);
+    head.appendChild(actions);
+    card.appendChild(head);
+
+    d.muscles.forEach(name => {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.style.position = "relative";
+      badge.style.paddingRight = "25px";
+      badge.innerHTML = `${name} <span class="removeBadge">×</span>`;
+      
+      badge.onclick = (e) => {
+        if(!e.target.classList.contains("removeBadge")) {
+          showDetail(findExercise(name));
+        }
+      };
+      
+      const removeBtn = badge.querySelector(".removeBadge");
+      removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        if(confirm("ลบท่า " + name + " ออกจากวัน" + weekDays[i].day + "?")) {
+          weekDays[i].muscles = weekDays[i].muscles.filter(m => m !== name);
+          renderSchedule();
+          renderExercises();
+          saveData();
+        }
+      };
+      
+      card.appendChild(badge);
+    });
+
+    box.appendChild(card);
+  });
+  
+  if(!hasAny) {
+    box.innerHTML = "<p style='color:#999; text-align:center; padding:20px'>ยังไม่มีตารางฝึก เริ่มต้นโดยการเลือกวันและเพิ่มท่าฝึก</p>";
+  }
+}
+
+function findExercise(name) {
+  for(const equipment in exercisesData) {
+    const ex = exercisesData[equipment].find(e => e.name === name);
+    if(ex) return ex;
+  }
+  return null;
+}
+
+function editDay(i) {
+  selectedDay = i;
+  const dayBtns = document.querySelectorAll(".equipmentBtn");
+  dayBtns.forEach(btn => btn.classList.remove("active"));
+  dayBtns[i].classList.add("active");
+  renderExercises();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function deleteDay(i) {
+  if(!confirm("ลบทุกท่าในวัน " + weekDays[i].day + " ?")) return;
+  weekDays[i].muscles = [];
+  renderSchedule();
+  saveData();
+}
+
+/* -------- modal -------- */
+function showDetail(ex) {
+  if(!ex) return;
+  document.getElementById("mTitle").innerText = ex.name;
+  
+  const img = document.getElementById("mImg");
+  if(ex.image && ex.image.trim() !== "") {
+    img.src = ex.image;
+    img.style.display = "block";
+    img.onerror = () => {img.style.display = "none";}; // ซ่อนถ้าลิงก์เสีย
+  } else {
+    img.style.display = "none";
+  }
+  
+  document.getElementById("mDesc").innerText = ex.description;
+  document.getElementById("mTarget").innerText = "🎯 กล้ามเนื้อ: " + ex.targets;
+  document.getElementById("mType").innerText = "📂 ประเภท: " + ex.type + " | กล้าม: " + ex.muscle;
+
+  const video = document.getElementById("mVideo");
+  const src = document.getElementById("mVideoSrc");
+
+  if(ex.video && ex.video.trim() !== "") {
+    src.src = ex.video;
+    video.load();
+    video.style.display = "block";
+    video.onerror = () => {video.style.display = "none";}; // ซ่อนถ้าไฟล์ไม่มี
+  } else {
+    video.style.display = "none";
+  }
+
+  document.getElementById("modal").classList.add("active");
+}
+
+function closeDetail() {
+  const video = document.getElementById("mVideo");
+  video.pause();
+  video.currentTime = 0;
+  document.getElementById("modal").classList.remove("active");
+}
+
+// Click outside modal to close
+document.getElementById("modal").addEventListener("click", function(e) {
+  if(e.target === this) closeDetail();
+});
+
+/* -------- เริ่มต้น -------- */
+window.onload = function() {
+  loadData();
+  renderDays();
+  renderEquipmentSelector();
+  renderSchedule();
+  setupSearch();
+};
+
+</script>
+
+</body>
+</html>
